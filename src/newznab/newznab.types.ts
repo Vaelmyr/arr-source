@@ -87,7 +87,7 @@ export interface NewznabCapsResponse {
     categories: NewznabCategory[];
 }
 
-interface NewznabSearchItem {
+export interface NewznabSearchItem {
     title: string;
     isPermaLink: boolean;
     guid: string;

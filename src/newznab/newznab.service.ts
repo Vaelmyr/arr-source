@@ -5,10 +5,13 @@ import type {
     NewznabSearchQuery,
     NewznabSearchResponse,
 } from './newznab.types.js';
+import { SearchService } from '../search/search.service.js';
 
 @Injectable()
 export class NewznabService {
     private readonly logger = new Logger(NewznabService.name);
+
+    constructor(private readonly searchService: SearchService) {}
 
     /**
      * The `CAPS` function is used to query the server for supported features and
@@ -62,36 +65,14 @@ export class NewznabService {
      * The `SEARCH` function searches the index for items matching the search criteria.
      * @see https://newznab.readthedocs.io/en/latest/misc/api.html#search
      */
-    public search(query: NewznabSearchQuery): NewznabSearchResponse {
+    public async search(
+        query: NewznabSearchQuery,
+    ): Promise<NewznabSearchResponse> {
         this.logger.debug(`Searching for query: ${JSON.stringify(query)}`);
 
-        return {
-            title: 'Search Results',
-            description: 'Search results from Newznab API',
-            offset: query.offset ?? 0,
-            total: 1,
-            items: [
-                {
-                    title: 'Test.Series.S01E01.1080p',
-                    guid: 'mock:test-series:s01e01:1080p',
-                    isPermaLink: false,
-                    pubDate: new Date().toUTCString(),
-                    category: 'TV',
-                    enclosure: {
-                        url: 'http://localhost:3000/api?t=get&id=mock',
-                        length: 1000000000,
-                        type: 'application/x-nzb',
-                    },
-                    attributes: {
-                        category: '5000',
-                        size: 1000000000,
-                        season: 1,
-                        episode: 1,
-                    },
-                },
-            ],
-        };
+        return this.searchService.search(query);
     }
+
     /**
      * The `GET` function returns an nzb for a guid.
      * @see https://newznab.readthedocs.io/en/latest/misc/api.html#get

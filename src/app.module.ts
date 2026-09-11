@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { NewznabModule } from './newznab/newznab.module.js';
 import { ConfigModule } from '@nestjs/config';
 import { envSchema, validateEnv } from './config/configuration.js';
+import { SearchModule } from './search/search.module.js';
+import { ProvidersModule } from './providers/providers.module.js';
 
 @Module({
     imports: [
@@ -13,6 +15,8 @@ import { envSchema, validateEnv } from './config/configuration.js';
             isGlobal: true,
         }),
         NewznabModule,
+        SearchModule,
+        ProvidersModule,
     ],
     controllers: [],
     providers: [],
