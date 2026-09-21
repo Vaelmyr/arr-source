@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { NewznabCapsResponse, NewznabSearchResponse } from './newznab.types.js';
+import {
+    NewznabCapsResponseDto,
+    NewznabGetResponseDto,
+    NewznabSearchResponseDto,
+} from './newznab.types.js';
 import { create } from 'xmlbuilder2';
 
 @Injectable()
 export class NewznabSerializer {
-    serializeCaps(response: NewznabCapsResponse) {
+    serializeCaps(response: NewznabCapsResponseDto) {
         const xml = create({
             version: '1.0',
             encoding: 'UTF-8',
@@ -72,7 +76,7 @@ export class NewznabSerializer {
         return xml.end({ prettyPrint: true });
     }
 
-    serializeSearch(response: NewznabSearchResponse) {
+    serializeSearch(response: NewznabSearchResponseDto) {
         const xml = create({
             version: '1.0',
             encoding: 'UTF-8',
@@ -104,7 +108,10 @@ export class NewznabSerializer {
                 .txt(item.guid);
 
             itemXml.ele('pubDate').txt(new Date(item.pubDate).toUTCString());
-            itemXml.ele('category').txt(item.category);
+
+            if (item.category) {
+                itemXml.ele('category').txt(item.category);
+            }
 
             itemXml.ele('enclosure', {
                 url: item.enclosure.url,
@@ -112,10 +119,10 @@ export class NewznabSerializer {
                 type: item.enclosure.type,
             });
 
-            for (const [name, value] of Object.entries(item.attributes ?? {})) {
+            for (const attribute of item.attributes) {
                 itemXml.ele('newznab:attr', {
-                    name,
-                    value: value.toString(),
+                    name: attribute.name,
+                    value: attribute.value.toString(),
                 });
             }
         }
@@ -123,7 +130,7 @@ export class NewznabSerializer {
         return xml.end({ prettyPrint: true });
     }
 
-    serializeGet() {
+    serializeGet(body: NewznabGetResponseDto) {
         const xml = create({
             version: '1.0',
             encoding: 'UTF-8',
@@ -135,6 +142,27 @@ export class NewznabSerializer {
             .ele('nzb', {
                 xmlns: 'http://www.newzbin.com/DTD/2003/nzb',
             });
+
+        xml.ele('head')
+            .ele('meta', {
+                type: 'X-Private-Download-Ref',
+            })
+            .txt(body.downloadRef);
+
+        const file = xml.ele('file', {
+            poster: 'internal',
+            subject: 'internal',
+            date: 0,
+        });
+
+        file.ele('groups').ele('group').txt('internal');
+
+        file.ele('segments')
+            .ele('segment', {
+                bytes: 1,
+                number: 1,
+            })
+            .txt(`dummy@internal`);
 
         return xml.end({ prettyPrint: true });
     }

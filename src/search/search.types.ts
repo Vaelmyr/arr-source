@@ -3,13 +3,13 @@ export enum SearchMediaType {
     MOVIE = 'movie',
 }
 
-export interface SearchDbIdentity {
+export class SearchDbIdentityDto {
     tvdbId?: number;
     tmdbId?: number;
     imdbId?: string;
 }
 
-export interface SearchRequest extends SearchDbIdentity {
+export class SearchRequestDto extends SearchDbIdentityDto {
     type: SearchMediaType;
 
     query?: string;

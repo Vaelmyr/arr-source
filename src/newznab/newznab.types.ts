@@ -11,20 +11,78 @@ export enum NewznabOutputType {
     JSON = 'json',
 }
 
-export interface NewznabBaseQuery {
+export class NewznabItemAttributeDto {
+    name: string;
+    value: string | number;
+}
+
+export class NewznabSearchItemDto {
+    title: string;
+
+    guid: string;
+    isPermaLink: boolean;
+
+    pubDate: string;
+    category?: string;
+
+    enclosure: {
+        url: string;
+        length: number;
+        type: 'application/x-nzb';
+    };
+
+    attributes: Array<NewznabItemAttributeDto>;
+}
+
+class NewznabCategoryDto {
+    id: number;
+    name: string;
+    subcat?: Omit<NewznabCategoryDto, 'subcat'>;
+}
+
+class NewznabSearchSupportDto {
+    available: 'yes' | 'no';
+    supportedParams: string;
+}
+
+export type NewznabApiQuery =
+    NewznabCapsQueryDto | NewznabSearchQueryDto | NewznabGetQueryDto;
+
+export class NewznabBaseQueryDto {
     t: NewznabApiType;
     o?: NewznabOutputType;
+    apikey?: string;
 
     [k: string]: any;
 }
 
-export interface NewznabCapsQuery extends NewznabBaseQuery {
-    t: NewznabApiType.CAPS;
+export class NewznabCapsQueryDto extends NewznabBaseQueryDto {
+    declare t: NewznabApiType.CAPS;
 }
 
-export interface NewznabSearchQuery extends NewznabBaseQuery {
-    t: NewznabApiType.SEARCH | NewznabApiType.TV_SEARCH | NewznabApiType.MOVIE;
-    apikey: string;
+export class NewznabCapsResponseDto {
+    server: {
+        version: string;
+        title: string;
+    };
+
+    limits: {
+        max: number;
+        default: number;
+    };
+
+    searching: Partial<{
+        search: NewznabSearchSupportDto;
+        tvSearch: NewznabSearchSupportDto;
+        movieSearch: NewznabSearchSupportDto;
+    }>;
+
+    categories: NewznabCategoryDto[];
+}
+
+export class NewznabSearchQueryDto extends NewznabBaseQueryDto {
+    declare t:
+        NewznabApiType.SEARCH | NewznabApiType.TV_SEARCH | NewznabApiType.MOVIE;
 
     q?: string;
     title?: string;
@@ -45,72 +103,23 @@ export interface NewznabSearchQuery extends NewznabBaseQuery {
     extended?: 0 | 1;
 }
 
-export interface NewznabGetQuery extends NewznabBaseQuery {
-    t: NewznabApiType.GET;
-    apikey: string;
-
-    id: string;
-    del?: 0 | 1;
-}
-
-export type NewznabApiQuery =
-    NewznabCapsQuery | NewznabSearchQuery | NewznabGetQuery;
-
-interface NewznabSearchSupport {
-    available: 'yes' | 'no';
-    supportedParams: string;
-}
-
-interface NewznabCategory {
-    id: number;
-    name: string;
-    subcat?: Omit<NewznabCategory, 'subcat'>;
-}
-
-export interface NewznabCapsResponse {
-    server: {
-        version: string;
-        title: string;
-    };
-
-    limits: {
-        max: number;
-        default: number;
-    };
-
-    searching: Partial<{
-        search: NewznabSearchSupport;
-        tvSearch: NewznabSearchSupport;
-        movieSearch: NewznabSearchSupport;
-    }>;
-
-    categories: NewznabCategory[];
-}
-
-export interface NewznabSearchItem {
-    title: string;
-    isPermaLink: boolean;
-    guid: string;
-    pubDate: string;
-    category: string;
-
-    enclosure: {
-        url: string;
-        length: number;
-        type: string;
-    };
-
-    attributes: Record<string, string | number>;
-}
-
-export interface NewznabSearchResponse {
+export class NewznabSearchResponseDto {
     title: string;
     description: string;
 
     offset: number;
     total: number;
 
-    items: NewznabSearchItem[];
+    items: Array<NewznabSearchItemDto>;
 }
 
-export interface NewznabGetResponse {}
+export class NewznabGetQueryDto extends NewznabBaseQueryDto {
+    declare t: NewznabApiType.GET;
+
+    id: string;
+    del?: 0 | 1;
+}
+
+export class NewznabGetResponseDto {
+    downloadRef: string;
+}

@@ -7,7 +7,12 @@ import {
     UseInterceptors,
 } from '@nestjs/common';
 import { NewznabService } from './newznab.service.js';
-import type { NewznabApiQuery } from './newznab.types.js';
+import type {
+    NewznabApiQuery,
+    NewznabCapsResponseDto,
+    NewznabGetResponseDto,
+    NewznabSearchResponseDto,
+} from './newznab.types.js';
 import { NewznabApiType } from './newznab.types.js';
 import { NewznabApiGuard } from './newznab-api.guard.js';
 import { NewznabTypeInterceptor } from './newznab-type.interceptor.js';
@@ -26,7 +31,13 @@ export class NewznabController {
      * @see https://newznab.readthedocs.io/en/latest/misc/api.html
      */
     @Get('api')
-    async handleApi(@Query() query: NewznabApiQuery): Promise<any> {
+    async handleApi(
+        @Query() query: NewznabApiQuery,
+    ): Promise<
+        | NewznabCapsResponseDto
+        | NewznabSearchResponseDto
+        | NewznabGetResponseDto
+    > {
         query = omit(query, ['apikey']) as NewznabApiQuery;
 
         this.logger.debug(`Received API request: ${JSON.stringify(query)}`);
@@ -39,7 +50,7 @@ export class NewznabController {
             case NewznabApiType.MOVIE:
                 return this.newznabService.search(query);
             case NewznabApiType.GET:
-                return this.newznabService.get();
+                return this.newznabService.get(query);
         }
     }
 }

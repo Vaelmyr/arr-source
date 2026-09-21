@@ -2,6 +2,7 @@ import { Module, Type } from '@nestjs/common';
 import { BaseProvider } from './base.provider.js';
 import { StreamingCommunityProvider } from './streaming-community/streaming-community.provider.js';
 import { StreamingCommunityModule } from './streaming-community/streaming-community.module.js';
+import { ProvidersMapper } from './providers.mapper.js';
 
 export const SEARCH_PROVIDERS = Symbol('SEARCH_PROVIDERS');
 
@@ -15,6 +16,7 @@ const AVAILABLE_PROVIDERS: Type<BaseProvider>[] = [StreamingCommunityProvider];
             useFactory: (...providers) => providers,
             inject: AVAILABLE_PROVIDERS,
         },
+        ProvidersMapper,
     ],
     exports: [SEARCH_PROVIDERS],
 })

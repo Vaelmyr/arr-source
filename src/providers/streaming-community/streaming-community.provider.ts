@@ -1,28 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectMapper } from '@automapper/nestjs';
+import type { Mapper } from '@automapper/core';
 import { BaseProvider } from '../base.provider.js';
 import { StreamingCommunityClient } from './streaming-community.client.js';
-import type {
-    ProviderMedia,
-    ProviderMediaIdentity,
-    ProviderRelease,
-    ProviderTvShow,
-} from '../providers.types.js';
-import type {
-    StreamingCommunityEpisode,
-    StreamingCommunitySeason,
-    StreamingCommunityShow,
-} from './streaming-community.types.js';
+import { ProviderMediaDto, ProviderReleaseDto } from '../providers.types.js';
 import {
-    SearchMediaType,
-    type SearchRequest,
-} from '../../search/search.types.js';
+    StreamingCommunityMediaDto,
+    StreamingCommunityReleaseDto,
+    StreamingCommunityDownloadRefDto,
+} from './streaming-community.types.js';
+import type { SearchRequestDto } from '../../search/search.types.js';
+import { VixcloudExtractor } from '../../extractors/vixcloud/vixcloud.extractor.js';
 
 @Injectable()
 export class StreamingCommunityProvider extends BaseProvider {
     private readonly logger = new Logger(StreamingCommunityProvider.name);
 
-    readonly id: string = 'streaming-community';
-    readonly name: string = 'Streaming Community';
+    readonly id = 'streaming-community';
+    readonly name = 'Streaming Community';
 
     readonly capabilities = {
         movies: false,
@@ -30,187 +25,156 @@ export class StreamingCommunityProvider extends BaseProvider {
         anime: false,
     };
 
-    constructor(private readonly client: StreamingCommunityClient) {
+    constructor(
+        @InjectMapper() private readonly mapper: Mapper,
+        private readonly client: StreamingCommunityClient,
+        private readonly vixcloudExtractor: VixcloudExtractor,
+    ) {
         super();
     }
 
-    public async search(request: SearchRequest): Promise<ProviderRelease[]> {
+    public async search(
+        request: SearchRequestDto,
+    ): Promise<Array<ProviderReleaseDto<StreamingCommunityDownloadRefDto>>> {
         this.logger.debug(
             `Searching on StreamingCommunity for Query=${request.query}, Season=${request.seasonNumber}, Episode=${request.episodeNumber}`,
         );
 
         const response = await this.client.search(request.query ?? '');
 
-        const media = response.data
-            .map((item) => this.mapMedia(item))
-            .filter((media): media is ProviderMedia => media !== undefined)
+        // Array of matching media (movies or TV shows) from the search results mapped to ProviderMediaDto
+        const media = this.mapper
+            .mapArray(
+                response.data,
+                StreamingCommunityMediaDto,
+                ProviderMediaDto,
+            )
             .filter((media) => this.matches(media, request));
+
+        this.logger.debug(
+            `Found ${media.length} matching media on StreamingCommunity for Query=${request.query}, Season=${request.seasonNumber}, Episode=${request.episodeNumber}`,
+        );
 
         if (!media) {
             return [];
         }
 
-        if (request.isBrowse) {
-            return this.resolveBrowseReleases(media);
+        const releases: StreamingCommunityReleaseDto[] = [];
+
+        for (const item of media) {
+            if (item.type === 'tv' && request.seasonNumber !== undefined) {
+                const season = await this.client.getSeason(
+                    item.id,
+                    request.seasonNumber,
+                );
+
+                this.logger.debug(
+                    `Fetched season details for TV Show=${item.canonicalTitle}, Season=${season.number}`,
+                );
+
+                const episodesToFetch = (
+                    request.episodeNumber
+                        ? [
+                              season.episodes.find(
+                                  (ep) =>
+                                      Number(ep.number) ===
+                                      request.episodeNumber,
+                              ),
+                          ]
+                        : season.episodes
+                ).filter((episode) => episode !== undefined);
+
+                if (episodesToFetch.length === 0) {
+                    this.logger.warn(
+                        `No episodes found for TV Show=${item.canonicalTitle}, Season=${season.number}, Episode=${request.episodeNumber}`,
+                    );
+
+                    return [];
+                }
+
+                for (const episode of episodesToFetch) {
+                    const streamingServer =
+                        await this.client.getEpisodeVideoServer(
+                            item.id,
+                            episode.number,
+                        );
+
+                    this.logger.debug(
+                        `Fetched streaming server for TV Show=${item.canonicalTitle}, Season=${season.number}, Episode=${episode.number}`,
+                        streamingServer,
+                    );
+
+                    if (!this.vixcloudExtractor.canHandle(streamingServer)) {
+                        this.logger.error(
+                            `Unsupported streaming server for TV Show=${item.canonicalTitle}, Season=${season.number}, Episode=${episode.number}: ${streamingServer}`,
+                        );
+                        return [];
+                    }
+
+                    const hlsStreams =
+                        await this.vixcloudExtractor.extract(streamingServer);
+
+                    this.logger.debug(
+                        `Extracted HLS streams for TV Show=${item.canonicalTitle}, Season=${season.number}, Episode=${episode.number}`,
+                        JSON.stringify(hlsStreams, null, 2),
+                    );
+
+                    for (const stream of hlsStreams) {
+                        releases.push({
+                            type: 'episode',
+
+                            id: `${item.id}:${season.id}:${episode.id}`,
+
+                            mediaTitle: item.canonicalTitle,
+                            episodeTitle:
+                                episode.name ??
+                                `${season.name}.S${String(season.number).padEnd(2, '0')}E${String(episode.number).padEnd(2, '0')}`,
+
+                            seasonNumber: season.number,
+                            episodeNumber: episode.number,
+
+                            quality: stream.quality,
+
+                            publishedAt: new Date(
+                                episode.uploaded_at ??
+                                    episode.updated_at ??
+                                    episode.created_at ??
+                                    Date.now(),
+                            ),
+
+                            streamUrl: stream.url,
+                            audioTracks: stream.audioTracks,
+                            subtitleTracks: stream.subtitleTracks,
+                        });
+                    }
+                }
+            } else if (item.type === 'movie') {
+                //TODO: Fetch movie details and map them to ProviderRelease[]
+                this.logger.warn(
+                    `Movie support is not yet implemented for StreamingCommunityProvider. Skipping movie: ${item.canonicalTitle}`,
+                );
+            }
         }
 
-        const releases = await Promise.all(
-            media.map((item) => this.resolveReleases(item, request)),
+        const output: Array<
+            ProviderReleaseDto<StreamingCommunityDownloadRefDto>
+        > = this.mapper.mapArray(
+            releases,
+            StreamingCommunityReleaseDto,
+            ProviderReleaseDto,
         );
-
-        return releases.flat();
-    }
-
-    private mapMedia(item: StreamingCommunityShow): ProviderMedia | undefined {
-        const identity = {
-            id: `${item.id}-${item.slug}`,
-            canonicalTitle: item.name,
-            aliases: [],
-            tmdbId: item.tmdb_id ? Number(item.tmdb_id) : undefined,
-            tvdbId: undefined,
-            imdbId: undefined,
-        };
-
-        switch (item.type) {
-            case 'tv':
-                return {
-                    ...identity,
-                    type: 'tv',
-                };
-
-            case 'movie':
-                return {
-                    ...identity,
-                    type: 'movie',
-                };
-        }
-    }
-
-    private mapRelease(
-        media: ProviderMedia,
-        season: StreamingCommunitySeason,
-        episode: StreamingCommunityEpisode,
-    ): ProviderRelease {
-        return {
-            id: `${media.id}:${season.number}:${episode.id}`,
-            mediaId: media.id,
-            providerId: this.id,
-            downloadId: `${episode.id}:${episode.scws_id}`,
-
-            type: 'episode',
-
-            title: this.createEpisodeReleaseTitle(
-                media,
-                season.number,
-                Number(episode.number),
-            ),
-
-            seasonNumber: season.number,
-            episodeNumber: Number(episode.number),
-
-            quality: episode.quality,
-            size: episode.size,
-
-            publishedAt: this.getPublishedDate(episode),
-        };
-    }
-
-    private createEpisodeReleaseTitle(
-        show: ProviderMedia,
-        seasonNumber: number,
-        episodeNumber: number,
-    ): string {
-        const title = show.canonicalTitle
-            .replace(/[^\p{L}\p{N}]+/gu, '.')
-            .replace(/^\.+|\.+$/g, '');
-
-        const season = seasonNumber.toString().padStart(2, '0');
-        const episode = episodeNumber.toString().padStart(2, '0');
-
-        return `${title}.S${season}E${episode}.StreamingCommunity`;
-    }
-
-    private async resolveBrowseReleases(
-        media: ProviderMedia[],
-    ): Promise<ProviderRelease[]> {
-        const show = media.find(
-            (item): item is ProviderTvShow => item.type === 'tv',
-        );
-
-        if (!show) {
-            return [];
-        }
-
-        return this.resolveReleases(show, {
-            type: SearchMediaType.TV,
-            seasonNumber: 1,
-            isBrowse: false,
-        });
-    }
-
-    private async resolveReleases(
-        media: ProviderMedia,
-        request: SearchRequest,
-    ): Promise<ProviderRelease[]> {
-        //TODO: Implement movie support
-        if (media.type !== 'tv') {
-            throw new Error(
-                `Unsupported media type: ${media.type}. Only TV shows are currently supported.`,
-            );
-        }
 
         this.logger.debug(
-            `Resolving releases for TV Show=${media.canonicalTitle}, Season=${request.seasonNumber}, Episode=${request.episodeNumber}`,
+            `Mapped ${output.length} releases for Query=${request.query}, Season=${request.seasonNumber}, Episode=${request.episodeNumber}`,
+            JSON.stringify(output, null, 2),
         );
 
-        if (request.seasonNumber === undefined) {
-            return [];
-        }
-
-        const season = await this.client.getSeason(
-            media.id,
-            request.seasonNumber,
-        );
-
-        let episodes = season?.episodes ?? [];
-
-        this.logger.debug(
-            `Fetched season episodes for TV Show=${media.canonicalTitle}, Season=${request.seasonNumber}`,
-            JSON.stringify(episodes, null, 2),
-        );
-
-        if (request.episodeNumber !== undefined) {
-            episodes = episodes.filter(
-                (episode) => Number(episode.number) === request.episodeNumber,
-            );
-        }
-
-        return episodes.map((episode) =>
-            this.mapRelease(media, season, episode),
-        );
-    }
-
-    private getPublishedDate(
-        episode: StreamingCommunityEpisode,
-    ): Date | undefined {
-        if (episode.uploaded_at) {
-            return new Date(episode.uploaded_at);
-        }
-
-        if (episode.updated_at) {
-            return new Date(episode.updated_at);
-        }
-
-        if (episode.created_at) {
-            return new Date(episode.created_at);
-        }
-
-        return new Date();
+        return output;
     }
 
     protected override matchesByTitle(
-        media: ProviderMediaIdentity,
-        request: SearchRequest,
+        media: ProviderMediaDto,
+        request: SearchRequestDto,
     ): boolean {
         if (super.matchesByTitle(media, request)) {
             return true;
@@ -220,8 +184,8 @@ export class StreamingCommunityProvider extends BaseProvider {
     }
 
     private matchesByLocalizedSubtitle(
-        media: ProviderMediaIdentity,
-        request: SearchRequest,
+        media: ProviderMediaDto,
+        request: SearchRequestDto,
     ): boolean {
         const normalizedRequestedTitle = this.normalizeTitle(
             request.query ?? '',

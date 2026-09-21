@@ -1,26 +1,44 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { Mapper } from '@automapper/core';
+import { InjectMapper } from '@automapper/nestjs';
 import {
     NewznabApiType,
-    NewznabSearchItem,
-    type NewznabSearchQuery,
-    type NewznabSearchResponse,
+    NewznabSearchItemDto,
+    type NewznabSearchQueryDto,
+    type NewznabSearchResponseDto,
 } from '../newznab/newznab.types.js';
 import { SEARCH_PROVIDERS } from '../providers/providers.module.js';
 import { BaseProvider } from '../providers/base.provider.js';
-import { SearchMediaType, type SearchRequest } from './search.types.js';
-import { ProviderRelease } from '../providers/providers.types.js';
+import { SearchMediaType, type SearchRequestDto } from './search.types.js';
+import { ProviderReleaseDto } from '../providers/providers.types.js';
 
 @Injectable()
 export class SearchService {
     private readonly logger = new Logger(SearchService.name);
 
     constructor(
-        @Inject(SEARCH_PROVIDERS)
-        private readonly providers: BaseProvider[],
+        @Inject(SEARCH_PROVIDERS) private readonly providers: BaseProvider[],
+        @InjectMapper() private readonly mapper: Mapper,
     ) {}
 
-    async search(query: NewznabSearchQuery): Promise<NewznabSearchResponse> {
-        const searchRequest = this.toSearchRequest(query);
+    async search(
+        query: NewznabSearchQueryDto,
+    ): Promise<NewznabSearchResponseDto> {
+        let searchRequest = this.toSearchRequest(query);
+
+        //TODO: Implement a proper browse search handling mechanism to support the `isBrowse` flag in the search request.
+        if (searchRequest.isBrowse) {
+            this.logger.debug(
+                `Browse search detected. Overriding query to 'Rick and Morty' with Season=1 and Episode=1`,
+            );
+
+            searchRequest = {
+                ...searchRequest,
+                query: 'Rick and Morty',
+                seasonNumber: 1,
+                episodeNumber: 1,
+            };
+        }
 
         const results = await Promise.allSettled(
             this.providers
@@ -30,7 +48,9 @@ export class SearchService {
 
         const fulfilledPromises = results
             .filter(
-                (result): result is PromiseFulfilledResult<ProviderRelease[]> =>
+                (
+                    result,
+                ): result is PromiseFulfilledResult<ProviderReleaseDto[]> =>
                     result.status === 'fulfilled',
             )
             .flatMap((result) => result.value);
@@ -54,32 +74,28 @@ export class SearchService {
             );
         }
 
-        //TODO: Map properly the results of the providers search to NewznabSearchResponse
+        const items = this.mapper.mapArray(
+            fulfilledPromises,
+            ProviderReleaseDto,
+            NewznabSearchItemDto,
+        );
+
+        this.logger.debug(
+            `Mapped search results to NewznabSearchItemDto:`,
+            JSON.stringify(items, null, 2),
+        );
+
+        //TODO: Implement correct `title` and `description` values for the NewznabSearchResponse based on the search query and results.
         return {
             title: 'Title',
             description: 'Description',
             offset: 0,
-            total: fulfilledPromises.length ?? 0,
-            items: fulfilledPromises.map(
-                (result) =>
-                    ({
-                        title: result.title,
-                        isPermaLink: false,
-                        guid: `${result.providerId}:${result.id}`,
-                        pubDate: result.publishedAt?.toISOString(),
-                        category: result.type,
-                        enclosure: {
-                            url: `${result.providerId}:${result.id}`,
-                            length: result.size,
-                            type: 'application/x-nzb',
-                        },
-                        attributes: {},
-                    }) as NewznabSearchItem,
-            ),
+            total: items.length ?? 0,
+            items,
         };
     }
 
-    private toSearchRequest(query: NewznabSearchQuery): SearchRequest {
+    private toSearchRequest(query: NewznabSearchQueryDto): SearchRequestDto {
         return {
             type: this.getMediaType(query),
 
@@ -101,7 +117,7 @@ export class SearchService {
         };
     }
 
-    private getMediaType(query: NewznabSearchQuery): SearchMediaType {
+    private getMediaType(query: NewznabSearchQueryDto): SearchMediaType {
         if (
             query.t === NewznabApiType.SEARCH ||
             query.t === NewznabApiType.TV_SEARCH

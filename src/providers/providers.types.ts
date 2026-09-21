@@ -1,56 +1,41 @@
-import type { SearchDbIdentity } from '../search/search.types.js';
+export class ProviderMediaDto {
+    type: 'tv' | 'movie';
 
-export interface ProviderMediaIdentity extends SearchDbIdentity {
     id: string;
 
     canonicalTitle: string;
     aliases: string[];
 
-    year?: number;
+    tvdbId?: number;
+    tmdbId?: number;
+    imdbId?: string;
 }
 
-export interface ProviderTvShow extends ProviderMediaIdentity {
-    type: 'tv';
-
-    seasons?: number[];
-}
-
-export interface ProviderMovie extends ProviderMediaIdentity {
-    type: 'movie';
-
-    duration?: number;
-}
-
-export interface ProviderEpisode {
-    id: string;
-
-    seriesId: string;
-
-    seasonNumber: number;
-    episodeNumber: number;
-
-    title?: string;
-
-    duration?: number;
-}
-
-export type ProviderMedia = ProviderTvShow | ProviderMovie;
-
-export interface ProviderRelease {
-    id: string;
-    mediaId: string;
+export class ProviderBaseDownloadRefDto {
     providerId: string;
-    downloadId: string;
+    data: unknown;
+}
 
-    type: 'movie' | 'episode';
+export class ProviderReleaseDto<TDownloadRefDto = ProviderBaseDownloadRefDto> {
+    id: string;
+    providerId: string;
 
     title: string;
+    episodeTitle?: string;
 
     seasonNumber?: number;
-    episodeNumber?: number;
+    episodeNumber?: string | number;
 
-    quality?: string;
     size?: number;
+    quality: string;
 
     publishedAt?: Date;
+
+    tvdbId?: number;
+    imdbId?: string;
+
+    audioLanguages: string[];
+    subtitleLanguages: string[];
+
+    downloadRef: TDownloadRefDto;
 }

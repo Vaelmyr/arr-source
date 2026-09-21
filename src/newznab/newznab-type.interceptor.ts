@@ -65,7 +65,7 @@ export class NewznabTypeInterceptor implements NestInterceptor {
                         return this.serializer.serializeSearch(body);
 
                     case NewznabApiType.GET:
-                        return this.serializer.serializeGet();
+                        return this.serializer.serializeGet(body);
 
                     default:
                         throw new NotAcceptableException(

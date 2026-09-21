@@ -1,49 +1,36 @@
+import { HlsStreamAudioTrackDto } from '../../extractors/extractors.types.js';
+import { ProviderBaseDownloadRefDto } from '../providers.types.js';
+
 export enum StreamingCommunityLocale {
     IT = 'it',
     EN = 'en',
 }
 
-export interface StreamingCommunitySearchResponse {
-    data: StreamingCommunityShow[];
-
-    current_page?: number;
-    last_page?: number;
-}
-
-export interface StreamingCommunityShow {
+export class StreamingCommunityMediaDto {
     id: number;
     slug: string;
-
     name: string;
 
-    type: string;
+    type: 'tv' | 'movie';
     quality?: string;
 
     tmdb_id?: string;
 }
 
-export interface StreamingCommunityParsedPage {
-    props: {
-        loadedSeason: StreamingCommunitySeason;
-    };
-}
-
-export interface StreamingCommunitySeason {
+export class StreamingCommunitySeasonDto {
     id: number;
     number: number;
+    title_id: number;
 
     name?: string;
     plot?: string;
 
-    title_id: number;
-
-    episodes: StreamingCommunityEpisode[];
+    episodes: Array<StreamingCommunityEpisodeDto>;
 }
 
-export interface StreamingCommunityEpisode {
+export class StreamingCommunityEpisodeDto {
     id: number;
     scws_id: number;
-
     season_id: number;
     number: number | string;
 
@@ -56,4 +43,46 @@ export interface StreamingCommunityEpisode {
     created_at?: string;
     updated_at?: string;
     uploaded_at?: string;
+}
+export class StreamingCommunitySearchResponseDto {
+    data: StreamingCommunityMediaDto[];
+
+    current_page?: number;
+    last_page?: number;
+}
+
+export class StreamingCommunityReleaseDto {
+    type: 'movie' | 'episode';
+
+    id: string;
+
+    mediaTitle: string;
+    episodeTitle?: string;
+
+    seasonNumber?: number;
+    episodeNumber?: string | number;
+
+    quality?: string;
+
+    publishedAt?: Date;
+
+    streamUrl: string;
+    audioTracks?: HlsStreamAudioTrackDto[];
+    subtitleTracks?: HlsStreamAudioTrackDto[];
+}
+
+export class StreamingCommunityPageJsonDto {
+    props: {
+        loadedSeason: StreamingCommunitySeasonDto;
+    };
+}
+
+export class StreamingCommunityDownloadRefDto implements ProviderBaseDownloadRefDto {
+    providerId: 'streaming-community';
+    data: {
+        type: 'episode';
+        id: string;
+        quality?: string;
+        language?: StreamingCommunityLocale;
+    };
 }

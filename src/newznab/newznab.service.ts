@@ -1,9 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { create } from 'xmlbuilder2';
+import {
+    Injectable,
+    InternalServerErrorException,
+    Logger,
+} from '@nestjs/common';
 import type {
-    NewznabCapsResponse,
-    NewznabSearchQuery,
-    NewznabSearchResponse,
+    NewznabCapsResponseDto,
+    NewznabGetQueryDto,
+    NewznabGetResponseDto,
+    NewznabSearchQueryDto,
+    NewznabSearchResponseDto,
 } from './newznab.types.js';
 import { SearchService } from '../search/search.service.js';
 
@@ -18,7 +23,9 @@ export class NewznabService {
      * the protocol version and other meta data relevant to the implementation.
      * @see https://newznab.readthedocs.io/en/latest/misc/api.html#caps
      */
-    public caps(): NewznabCapsResponse {
+    //TODO: Understand if there is a way to determine automatically the parameters
+    //TODO: supported by the search endpoint, and the categories supported by the server.
+    public caps(): NewznabCapsResponseDto {
         this.logger.debug('Returning capabilities for Newznab API');
 
         return {
@@ -66,8 +73,8 @@ export class NewznabService {
      * @see https://newznab.readthedocs.io/en/latest/misc/api.html#search
      */
     public async search(
-        query: NewznabSearchQuery,
-    ): Promise<NewznabSearchResponse> {
+        query: NewznabSearchQueryDto,
+    ): Promise<NewznabSearchResponseDto> {
         this.logger.debug(`Searching for query: ${JSON.stringify(query)}`);
 
         return this.searchService.search(query);
@@ -77,24 +84,25 @@ export class NewznabService {
      * The `GET` function returns an nzb for a guid.
      * @see https://newznab.readthedocs.io/en/latest/misc/api.html#get
      */
-    public get() {
+    //TODO: Properly implement the GET function to return the actual NZB file.
+    public get(query: NewznabGetQueryDto): NewznabGetResponseDto {
         this.logger.debug('Returning NZB file for GET request');
+        let downloadRef: string;
 
-        const obj = {
-            nzb: {
-                '@xmlns': 'http://www.newzbin.com/DTD/2003/nzb',
-            },
+        try {
+            downloadRef = JSON.parse(atob(query.id));
+            this.logger.debug(
+                `Parsed download reference: ${JSON.stringify(downloadRef)}`,
+            );
+        } catch {
+            this.logger.error('Failed to parse download reference');
+            throw new InternalServerErrorException(
+                'Invalid download reference',
+            );
+        }
+
+        return {
+            downloadRef: query.id,
         };
-
-        return create({
-            version: '1.0',
-            encoding: 'UTF-8',
-        })
-            .dtd({
-                pubID: '-//newzBin//DTD NZB 1.1//EN',
-                sysID: 'http://www.newzbin.com/DTD/nzb/nzb-1.1.dtd',
-            })
-            .ele(obj)
-            .end({ prettyPrint: true });
     }
 }

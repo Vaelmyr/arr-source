@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
-import { NewznabModule } from './newznab/newznab.module.js';
 import { ConfigModule } from '@nestjs/config';
+import { AutomapperModule } from '@automapper/nestjs';
+import { classes } from '@automapper/classes';
+import { NewznabModule } from './newznab/newznab.module.js';
 import { envSchema, validateEnv } from './config/configuration.js';
 import { SearchModule } from './search/search.module.js';
 import { ProvidersModule } from './providers/providers.module.js';
+import { SabnzbdModule } from './sabnzbd/sabnzbd.module.js';
 
 @Module({
     imports: [
@@ -14,11 +17,14 @@ import { ProvidersModule } from './providers/providers.module.js';
             cache: true,
             isGlobal: true,
         }),
+        AutomapperModule.forRoot({
+            strategyInitializer: classes(),
+        }),
         NewznabModule,
+        SabnzbdModule,
         SearchModule,
         ProvidersModule,
     ],
     controllers: [],
-    providers: [],
 })
 export class AppModule {}

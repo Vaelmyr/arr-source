@@ -1,11 +1,11 @@
 import { inRange } from 'es-toolkit/math';
 import {
-    type SearchDbIdentity,
-    type SearchRequest,
+    type SearchDbIdentityDto,
+    type SearchRequestDto,
 } from '../search/search.types.js';
 import type {
-    ProviderMediaIdentity,
-    ProviderRelease,
+    ProviderMediaDto,
+    ProviderReleaseDto,
 } from './providers.types.js';
 
 const MIN_TITLE_LENGTH_FOR_SINGLE_EDIT_MATCH = 12;
@@ -32,7 +32,9 @@ export abstract class BaseProvider {
      * @returns A promise that resolves to an array of matching releases.
      * @throws An error if the search fails.
      */
-    public abstract search(request: SearchRequest): Promise<ProviderRelease[]>;
+    public abstract search(
+        request: SearchRequestDto,
+    ): Promise<ProviderReleaseDto[]>;
 
     /**
      * Check if the provider supports the given categories.
@@ -73,8 +75,8 @@ export abstract class BaseProvider {
      * @returns `true` if the media matches the search request, `false` otherwise.
      */
     protected matches(
-        media: ProviderMediaIdentity,
-        request: SearchRequest,
+        media: ProviderMediaDto,
+        request: SearchRequestDto,
     ): boolean {
         if (request.isBrowse) {
             return true;
@@ -100,9 +102,9 @@ export abstract class BaseProvider {
      * @returns `true` if the media matches the search request based on the specified database ID, `false` if it does not match, or `undefined` if either ID is not present.
      */
     protected matchesByMediaDbId(
-        media: ProviderMediaIdentity,
-        request: SearchRequest,
-        idKey: keyof SearchDbIdentity,
+        media: ProviderMediaDto,
+        request: SearchRequestDto,
+        idKey: keyof SearchDbIdentityDto,
     ): boolean | undefined {
         const mediaId = media[idKey];
         const requestedId = request[idKey];
@@ -122,8 +124,8 @@ export abstract class BaseProvider {
      * @returns `true` if the media matches the search request based on title or aliases, `false` otherwise.
      */
     protected matchesByTitle(
-        media: ProviderMediaIdentity,
-        request: SearchRequest,
+        media: ProviderMediaDto,
+        request: SearchRequestDto,
     ): boolean {
         if (!request.query?.trim()) {
             return false;
