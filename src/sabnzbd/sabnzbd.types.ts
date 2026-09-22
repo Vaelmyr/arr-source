@@ -7,6 +7,39 @@ export enum SabnzbdApiMode {
     RETRY = 'retry',
 }
 
+export enum SabnzbdDownloadStatus {
+    UNKNOWN = 'Unknown',
+    QUEUED = 'Queued',
+    DOWNLOADING = 'Downloading',
+    PAUSED = 'Paused',
+    COMPLETED = 'Completed',
+    FAILED = 'Failed',
+}
+
+export enum SabnzbdDownloadPriority {
+    DEFAULT = -100,
+    PAUSED = -2,
+    LOW = -1,
+    NORMAL = 0,
+    HIGH = 1,
+    FORCE = 2,
+}
+
+export enum SabnzbdQueuePriority {
+    PAUSED = 'Paused',
+    LOW = 'Low',
+    NORMAL = 'Normal',
+    HIGH = 'High',
+    FORCE = 'Force',
+}
+
+export type SabnzbdApiQuery =
+    | SabnzbdVersionQueryDto
+    | SabnzbdGetConfigQueryDto
+    | SabnzbdAddFileQueryDto
+    | SabnzbdQueueQueryDto
+    | SabnzbdHistoryQueryDto;
+
 export class SabnzbdBaseQueryDto {
     mode: SabnzbdApiMode;
     output: 'json';
@@ -14,9 +47,6 @@ export class SabnzbdBaseQueryDto {
 
     [k: string]: any;
 }
-
-export type SabnzbdApiQuery =
-    SabnzbdVersionQueryDto | SabnzbdGetConfigQueryDto | SabnzbdAddFileQueryDto;
 
 export class SabnzbdVersionQueryDto extends SabnzbdBaseQueryDto {
     declare mode: SabnzbdApiMode.VERSION;
@@ -65,9 +95,68 @@ export class SabnzbdGetConfigResponseDto {
 
 export class SabnzbdAddFileQueryDto extends SabnzbdBaseQueryDto {
     declare mode: SabnzbdApiMode.ADD_FILE;
+
+    cat?: string;
+    priority: number;
 }
 
-export class SabnzbdAddFileResponseDto {}
+export class SabnzbdAddFileResponseDto {
+    status: boolean;
+    nzo_ids: string[];
+}
+
+export class SabnzbdQueueQueryDto extends SabnzbdBaseQueryDto {
+    declare mode: SabnzbdApiMode.QUEUE;
+}
+
+export class SabnzbdQueueResponseDto {
+    queue: {
+        paused: boolean;
+        slots: SabnzbdQueueSlotDto[];
+    };
+}
+
+export class SabnzbdQueueSlotDto {
+    nzo_id: string;
+    filename: string;
+
+    index: number;
+    status: SabnzbdDownloadStatus;
+
+    priority: SabnzbdQueuePriority;
+    cat: string;
+
+    timeleft: string;
+    mb: string;
+    mbleft: string;
+    percentage: number;
+}
+
+export class SabnzbdHistoryQueryDto extends SabnzbdBaseQueryDto {
+    declare mode: SabnzbdApiMode.HISTORY;
+}
+
+export class SabnzbdHistoryResponseDto {
+    history: {
+        slots: SabnzbdHistorySlotDto[];
+    };
+}
+
+export class SabnzbdHistorySlotDto {
+    nzo_id: string;
+
+    name: string;
+    nzb_name: string;
+
+    cat: string;
+    status: SabnzbdDownloadStatus;
+
+    bytes: number;
+    storage: string;
+
+    fail_message: string;
+    download_time: number;
+}
 
 export class SabnzbdUploadedFileXmlObject {
     nzb: {

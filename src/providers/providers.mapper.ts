@@ -65,12 +65,26 @@ export class ProvidersMapper extends AutomapperProfile {
     //TODO: Test and properly implement the `APP_BASE_URL` variable to build properly the download URL for the NZB file.
     private buildDownloadUrl(release: ProviderReleaseDto): string {
         const url = new URL(
-            '/api',
+            '/newznab/api',
             this.config.get<string>('APP_BASE_URL', 'http://localhost:3000'),
         );
 
+        const title = this.buildSonarrReleaseTitle(release);
+        const extendedDownloadRef = Object.assign(release.downloadRef, {
+            title,
+        });
+
+        const base64EncodedDownloadRef = Buffer.from(
+            JSON.stringify(extendedDownloadRef),
+        ).toString('base64');
+
         url.searchParams.set('t', 'get');
-        url.searchParams.set('id', release.id);
+        url.searchParams.set('id', base64EncodedDownloadRef);
+        url.searchParams.set('apikey', this.config.get<string>('API_KEY', ''));
+
+        console.log(
+            `Download URL for release ${release.id}: ${url.toString()}`,
+        );
 
         return url.toString();
     }
@@ -81,13 +95,9 @@ export class ProvidersMapper extends AutomapperProfile {
         const season = String(release.seasonNumber).padStart(2, '0');
         const episode = String(release.episodeNumber).padStart(2, '0');
 
-        return [
-            title,
-            `S${season}E${episode}`,
-            release.quality,
-            'WEB-DL',
-            release.providerId,
-        ].join('.');
+        return [title, `S${season}E${episode}`, release.quality, 'WEB-DL'].join(
+            '.',
+        );
     }
 
     private normalizeReleaseTitle(value: string): string {

@@ -111,6 +111,8 @@ export class StreamingCommunityMapper extends AutomapperProfile {
                         (s) =>
                             ({
                                 providerId: 'streaming-community',
+                                itemId: `${s.id}:${s.quality}`,
+
                                 data: {
                                     type: 'episode',
                                     id: s.id,

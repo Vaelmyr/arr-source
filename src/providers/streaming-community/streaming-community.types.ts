@@ -79,6 +79,8 @@ export class StreamingCommunityPageJsonDto {
 
 export class StreamingCommunityDownloadRefDto implements ProviderBaseDownloadRefDto {
     providerId: 'streaming-community';
+    itemId: string;
+
     data: {
         type: 'episode';
         id: string;

@@ -1,16 +1,33 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { create } from 'xmlbuilder2';
-import type {
-    SabnzbdAddFileQueryDto,
-    SabnzbdVersionResponseDto,
-    SabnzbdUploadedFileXmlObject,
-    SabnzbdGetConfigResponseDto,
-    SabnzbdAddFileResponseDto,
+import {
+    type SabnzbdAddFileQueryDto,
+    type SabnzbdVersionResponseDto,
+    type SabnzbdUploadedFileXmlObject,
+    type SabnzbdGetConfigResponseDto,
+    type SabnzbdAddFileResponseDto,
+    type SabnzbdQueueResponseDto,
+    SabnzbdQueueSlotDto,
+    SabnzbdHistoryResponseDto,
+    SabnzbdHistorySlotDto,
 } from './sabnzbd.types.js';
+import { PrismaService } from '../prisma.service.js';
+import { DownloadStatus } from '../generated/prisma/enums.js';
+import { ProviderBaseDownloadRefDto } from '../providers/providers.types.js';
+import type { Mapper } from '@automapper/core';
+import { InjectMapper } from '@automapper/nestjs';
+import { DownloadDto } from '../prisma.types.js';
 
 @Injectable()
 export class SabnzbdService {
+    private readonly logger = new Logger(SabnzbdService.name);
+
     private readonly SABNZBD_VERSION = '5.1.0';
+
+    constructor(
+        @InjectMapper() readonly mapper: Mapper,
+        private readonly prisma: PrismaService,
+    ) {}
 
     /**
      * Get version of running SABnzbd
@@ -63,7 +80,6 @@ export class SabnzbdService {
      * Add NZB by file upload
      * @see https://sabnzbd.org/wiki/configuration/5.1/api#addfile
      */
-    //TODO: Implement a proper NZB file handling system to process the uploaded NZB files and add them to the SABnzbd queue.
     async addFile(
         query: SabnzbdAddFileQueryDto,
         file: Express.Multer.File,
@@ -82,8 +98,104 @@ export class SabnzbdService {
             );
         }
 
-        const downloadRef = JSON.parse(atob(parsedXml.nzb.head.meta['#']));
+        const downloadRef = parsedXml.nzb.head.meta['#'];
+        let parsedDownloadRef: ProviderBaseDownloadRefDto & { title: string };
 
-        return {};
+        try {
+            parsedDownloadRef = JSON.parse(
+                Buffer.from(downloadRef, 'base64').toString('utf-8'),
+            );
+        } catch (error) {
+            throw new BadRequestException(
+                'Invalid NZB file: X-Private-Download-Ref meta tag is not a valid base64-encoded JSON string',
+            );
+        }
+
+        const download = await this.prisma.download.create({
+            data: {
+                id: `SABnzbd_nzo_${crypto.randomUUID()}`,
+                providerId: parsedDownloadRef.providerId,
+                itemId: parsedDownloadRef.itemId,
+                title: parsedDownloadRef.title,
+                category: query.cat,
+                priority: Number(query.priority ?? -100),
+                status: DownloadStatus.QUEUED,
+            },
+        });
+
+        this.logger.debug(
+            `Created download entry with ID '${download.id}' for provider '${parsedDownloadRef.providerId}' and item '${parsedDownloadRef.title}'`,
+        );
+
+        return {
+            status: true,
+            nzo_ids: [download.id],
+        };
+    }
+
+    /**
+     * Get the current queue of downloads
+     * @see https://sabnzbd.org/wiki/configuration/5.1/api#queue
+     */
+    async queue(): Promise<SabnzbdQueueResponseDto> {
+        const downloads = await this.prisma.download.findMany({
+            where: {
+                status: {
+                    in: [
+                        DownloadStatus.QUEUED,
+                        DownloadStatus.DOWNLOADING,
+                        DownloadStatus.PAUSED,
+                    ],
+                },
+            },
+            orderBy: {
+                createdAt: 'asc',
+            },
+        });
+
+        const slots = downloads.map((download, index) =>
+            this.mapper.map(download, DownloadDto, SabnzbdQueueSlotDto, {
+                extraArgs: () => ({ index }),
+            }),
+        );
+
+        this.logger.debug(
+            `Returning ${slots.length} slots in the queue response for SABnzbd`,
+            JSON.stringify(slots, undefined, 2),
+        );
+
+        return {
+            queue: {
+                paused: false,
+                slots,
+            },
+        };
+    }
+
+    /**
+     * Get the history of completed and failed downloads
+     * @see https://sabnzbd.org/wiki/configuration/5.1/api#history
+     */
+    async history(): Promise<SabnzbdHistoryResponseDto> {
+        const downloads = await this.prisma.download.findMany({
+            where: {
+                status: {
+                    in: [DownloadStatus.COMPLETED, DownloadStatus.FAILED],
+                },
+            },
+            orderBy: {
+                completedAt: 'desc',
+            },
+        });
+
+        return {
+            history: {
+                slots: this.mapper.mapArray(
+                    downloads,
+                    DownloadDto,
+                    SabnzbdHistorySlotDto,
+                ),
+            },
+        };
     }
 }

@@ -11,6 +11,8 @@ import {
     SabnzbdAddFileResponseDto,
     SabnzbdApiMode,
     SabnzbdGetConfigResponseDto,
+    SabnzbdHistoryResponseDto,
+    SabnzbdQueueResponseDto,
     SabnzbdVersionResponseDto,
     type SabnzbdApiQuery,
 } from './sabnzbd.types.js';
@@ -30,7 +32,12 @@ export class SabnzbdController {
     @Get('api')
     async handleGetApi(
         @Query() query: SabnzbdApiQuery,
-    ): Promise<SabnzbdVersionResponseDto | SabnzbdGetConfigResponseDto> {
+    ): Promise<
+        | SabnzbdVersionResponseDto
+        | SabnzbdGetConfigResponseDto
+        | SabnzbdQueueResponseDto
+        | SabnzbdHistoryResponseDto
+    > {
         this.logger.debug(`Received GET API request: ${JSON.stringify(query)}`);
 
         switch (query.mode) {
@@ -38,8 +45,16 @@ export class SabnzbdController {
                 return this.sabnzbdService.version();
             case SabnzbdApiMode.GET_CONFIG:
                 return this.sabnzbdService.getConfig();
+            case SabnzbdApiMode.QUEUE:
+                return this.sabnzbdService.queue();
+            case SabnzbdApiMode.HISTORY:
+                return this.sabnzbdService.history();
             default:
-                throw new Error(`Unsupported SABnzbd API mode: ${query.mode}`);
+                this.logger.warn(
+                    `Unsupported SABnzbd API mode: ${query.mode}. Returning empty response.`,
+                );
+                // throw new Error(`Unsupported SABnzbd API mode: ${query.mode}`);
+                return {} as any;
         }
     }
 

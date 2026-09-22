@@ -13,6 +13,8 @@ export class ProviderMediaDto {
 
 export class ProviderBaseDownloadRefDto {
     providerId: string;
+    itemId: string;
+
     data: unknown;
 }
 

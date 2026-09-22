@@ -84,22 +84,8 @@ export class NewznabService {
      * The `GET` function returns an nzb for a guid.
      * @see https://newznab.readthedocs.io/en/latest/misc/api.html#get
      */
-    //TODO: Properly implement the GET function to return the actual NZB file.
     public get(query: NewznabGetQueryDto): NewznabGetResponseDto {
-        this.logger.debug('Returning NZB file for GET request');
-        let downloadRef: string;
-
-        try {
-            downloadRef = JSON.parse(atob(query.id));
-            this.logger.debug(
-                `Parsed download reference: ${JSON.stringify(downloadRef)}`,
-            );
-        } catch {
-            this.logger.error('Failed to parse download reference');
-            throw new InternalServerErrorException(
-                'Invalid download reference',
-            );
-        }
+        this.logger.debug(`Getting NZB for query: ${JSON.stringify(query)}`);
 
         return {
             downloadRef: query.id,
