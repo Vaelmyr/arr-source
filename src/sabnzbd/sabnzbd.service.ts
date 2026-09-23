@@ -17,6 +17,9 @@ import { ProviderBaseDownloadRefDto } from '../providers/providers.types.js';
 import type { Mapper } from '@automapper/core';
 import { InjectMapper } from '@automapper/nestjs';
 import { DownloadDto } from '../prisma.types.js';
+import { DownloadScheduler } from '../download/download.scheduler.js';
+import { InputJsonObject } from '@prisma/client/runtime/client';
+import path from 'path';
 
 @Injectable()
 export class SabnzbdService {
@@ -27,6 +30,7 @@ export class SabnzbdService {
     constructor(
         @InjectMapper() readonly mapper: Mapper,
         private readonly prisma: PrismaService,
+        private readonly downloadScheduler: DownloadScheduler,
     ) {}
 
     /**
@@ -111,17 +115,36 @@ export class SabnzbdService {
             );
         }
 
+        //TODO: Get download dir from config
+        const downloadsDir = '.dev/downloads';
+
+        const tempPath = path.join(
+            downloadsDir,
+            '.partial',
+            `${parsedDownloadRef.title}.mkv`,
+        );
+
+        const outputPath = path.join(
+            downloadsDir,
+            `${parsedDownloadRef.title}.mkv`,
+        );
+
         const download = await this.prisma.download.create({
             data: {
                 id: `SABnzbd_nzo_${crypto.randomUUID()}`,
                 providerId: parsedDownloadRef.providerId,
                 itemId: parsedDownloadRef.itemId,
                 title: parsedDownloadRef.title,
+                tempPath,
+                outputPath,
+                downloadRef: parsedDownloadRef.data as InputJsonObject,
                 category: query.cat,
                 priority: Number(query.priority ?? -100),
                 status: DownloadStatus.QUEUED,
             },
         });
+
+        this.downloadScheduler.enqueue(download.id);
 
         this.logger.debug(
             `Created download entry with ID '${download.id}' for provider '${parsedDownloadRef.providerId}' and item '${parsedDownloadRef.title}'`,

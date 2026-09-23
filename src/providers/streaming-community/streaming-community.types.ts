@@ -84,6 +84,7 @@ export class StreamingCommunityDownloadRefDto implements ProviderBaseDownloadRef
     data: {
         type: 'episode';
         id: string;
+        episodeNumber: number | string;
         quality?: string;
         language?: StreamingCommunityLocale;
     };

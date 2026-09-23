@@ -116,6 +116,7 @@ export class StreamingCommunityMapper extends AutomapperProfile {
                                 data: {
                                     type: 'episode',
                                     id: s.id,
+                                    episodeNumber: s.episodeNumber,
                                     quality: s.quality,
                                 },
                             }) as StreamingCommunityDownloadRefDto,

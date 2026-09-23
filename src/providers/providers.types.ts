@@ -1,3 +1,5 @@
+export const SEARCH_PROVIDERS = Symbol('SEARCH_PROVIDERS');
+
 export class ProviderMediaDto {
     type: 'tv' | 'movie';
 

@@ -7,10 +7,12 @@ import {
     type NewznabSearchQueryDto,
     type NewznabSearchResponseDto,
 } from '../newznab/newznab.types.js';
-import { SEARCH_PROVIDERS } from '../providers/providers.module.js';
 import { BaseProvider } from '../providers/base.provider.js';
 import { SearchMediaType, type SearchRequestDto } from './search.types.js';
-import { ProviderReleaseDto } from '../providers/providers.types.js';
+import {
+    ProviderReleaseDto,
+    SEARCH_PROVIDERS,
+} from '../providers/providers.types.js';
 
 @Injectable()
 export class SearchService {

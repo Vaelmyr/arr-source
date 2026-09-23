@@ -4,9 +4,11 @@ import {
     type SearchRequestDto,
 } from '../search/search.types.js';
 import type {
+    ProviderBaseDownloadRefDto,
     ProviderMediaDto,
     ProviderReleaseDto,
 } from './providers.types.js';
+import { HlsStreamDto } from '../extractors/extractors.types.js';
 
 const MIN_TITLE_LENGTH_FOR_SINGLE_EDIT_MATCH = 12;
 
@@ -35,6 +37,10 @@ export abstract class BaseProvider {
     public abstract search(
         request: SearchRequestDto,
     ): Promise<ProviderReleaseDto[]>;
+
+    public abstract resolveDownload(
+        downloadRef: ProviderBaseDownloadRefDto['data'],
+    ): Promise<HlsStreamDto | undefined>;
 
     /**
      * Check if the provider supports the given categories.

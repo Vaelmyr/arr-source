@@ -3,8 +3,8 @@ import { BaseProvider } from './base.provider.js';
 import { StreamingCommunityProvider } from './streaming-community/streaming-community.provider.js';
 import { StreamingCommunityModule } from './streaming-community/streaming-community.module.js';
 import { ProvidersMapper } from './providers.mapper.js';
-
-export const SEARCH_PROVIDERS = Symbol('SEARCH_PROVIDERS');
+import { ProvidersRegistry } from './providers.registry.js';
+import { SEARCH_PROVIDERS } from './providers.types.js';
 
 const AVAILABLE_PROVIDERS: Type<BaseProvider>[] = [StreamingCommunityProvider];
 
@@ -17,7 +17,8 @@ const AVAILABLE_PROVIDERS: Type<BaseProvider>[] = [StreamingCommunityProvider];
             inject: AVAILABLE_PROVIDERS,
         },
         ProvidersMapper,
+        ProvidersRegistry,
     ],
-    exports: [SEARCH_PROVIDERS],
+    exports: [SEARCH_PROVIDERS, ProvidersRegistry],
 })
 export class ProvidersModule {}

@@ -11,6 +11,7 @@ import {
 } from './streaming-community.types.js';
 import type { SearchRequestDto } from '../../search/search.types.js';
 import { VixcloudExtractor } from '../../extractors/vixcloud/vixcloud.extractor.js';
+import { HlsStreamDto } from '../../extractors/extractors.types.js';
 
 @Injectable()
 export class StreamingCommunityProvider extends BaseProvider {
@@ -170,6 +171,60 @@ export class StreamingCommunityProvider extends BaseProvider {
         );
 
         return output;
+    }
+
+    /**
+     * Resolve a download reference to an actual HLS stream URL.
+     */
+    public async resolveDownload(
+        downloadRef: StreamingCommunityDownloadRefDto['data'],
+    ): Promise<HlsStreamDto | undefined> {
+        this.logger.debug(
+            `Resolving download for StreamingCommunity with DownloadRef=${JSON.stringify(downloadRef)}`,
+        );
+
+        const streamingServer = await this.client.getEpisodeVideoServer(
+            downloadRef.id,
+            downloadRef.episodeNumber,
+        );
+
+        this.logger.debug(
+            `Fetched streaming server for StreamingCommunity with DownloadRef=${JSON.stringify(downloadRef)}`,
+            streamingServer,
+        );
+
+        if (!this.vixcloudExtractor.canHandle(streamingServer)) {
+            this.logger.error(
+                `Unsupported streaming server for StreamingCommunity with DownloadRef=${JSON.stringify(downloadRef)}: ${streamingServer}`,
+            );
+            return;
+        }
+
+        const hlsStreams =
+            await this.vixcloudExtractor.extract(streamingServer);
+
+        this.logger.debug(
+            `Extracted HLS streams for StreamingCommunity with DownloadRef=${JSON.stringify(downloadRef)}`,
+            JSON.stringify(hlsStreams, null, 2),
+        );
+
+        const matchingStream = hlsStreams.find(
+            (stream) => stream.quality === downloadRef.quality,
+        );
+
+        if (!matchingStream) {
+            this.logger.error(
+                `No matching HLS stream found for StreamingCommunity with DownloadRef=${JSON.stringify(downloadRef)} and Quality=${downloadRef.quality}`,
+            );
+            return;
+        }
+
+        this.logger.debug(
+            `Found matching HLS stream for StreamingCommunity with DownloadRef=${JSON.stringify(downloadRef)} and Quality=${downloadRef.quality}`,
+            JSON.stringify(matchingStream, null, 2),
+        );
+
+        return matchingStream;
     }
 
     protected override matchesByTitle(

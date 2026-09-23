@@ -8,9 +8,9 @@ export class PrismaService
     extends PrismaClient
     implements OnModuleInit, OnModuleDestroy
 {
-    constructor(private readonly configService: ConfigService) {
+    constructor(private readonly config: ConfigService) {
         const adapter = new PrismaBetterSqlite3({
-            url: configService.get<string>('DATABASE_URL'),
+            url: config.get<string>('DATABASE_URL'),
         });
 
         super({ adapter });

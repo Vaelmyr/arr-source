@@ -1,3 +1,4 @@
+import { JsonValue } from '@prisma/client/runtime/client';
 import { Download, DownloadStatus } from './generated/prisma/client.js';
 
 export class DownloadDto implements Download {
@@ -9,6 +10,8 @@ export class DownloadDto implements Download {
 
     title: string;
     category: string | null;
+
+    downloadRef: JsonValue;
 
     status: DownloadStatus;
     priority: number;

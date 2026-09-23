@@ -14,6 +14,8 @@ model Download {
   title      String
   category   String?
 
+  downloadRef Json?
+
   priority Int            @default(-100)
   status   DownloadStatus
 
